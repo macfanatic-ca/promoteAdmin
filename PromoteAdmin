@@ -1,0 +1,52 @@
+#bin/bash
+
+#################################
+# Created by JonY.              #
+# Should run as Root            #
+# Version 1.1                   #
+# April 29th, 2015              #
+# Added error checking and      #
+# echo statements for logging   #
+#################################
+
+#AD Group to verify membership before promoting
+ldapverify="laptop-admins"
+
+############### Do Not Edit #############
+
+#Grab Username
+USERNAME=`who |grep console| awk '{print $1}'`
+
+#Checks ldap group for username.
+adGroup=$(dseditgroup -o checkmember -u "$USERNAME" $ldapverify | awk '{print $1}')
+
+if [ "$adGroup" == "no" ]; then
+#Exits if user is not found in group.
+	echo "User not found in "$ldapverify""
+	/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -title "Promote Admin" -heading "Error" -description "According to AD, this user should not have administrative access, Contact the Help Desk" -button1 "Dismiss" -defaultButton 1 -icon /Library/Hyperwallet/hwicon.icns
+	exit 10
+	
+elif [ "$adGroup" == "yes" ]; then
+#User is added to admin group.
+echo "Promoting "$USERNAME" with admin privileges"
+dseditgroup -o edit -n /Local/Default -a "$USERNAME" -t user admin
+
+else
+echo "Unable to verify AD Group Membership"
+/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -title "Promote Admin" -heading "Error" -description "Unable to connect with AD, Contact the Help Desk" -button1 "Dismiss" -defaultButton 1 -icon /Library/Hyperwallet/hwicon.icns
+exit 99
+fi
+
+#Checks membership
+chkmember=$(dseditgroup -o checkmember -u "$USERNAME" -t user admin | awk '{print $1}')
+
+if [ "$chkmember" == "yes" ]; then
+echo ""$USERNAME" now has admin privileges"
+/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -title "Promote Admin" -heading "Success" -description "Your elevated account now has admin privileges" -button1 "Thanks!" -defaultButton 1 -icon /Library/Hyperwallet/hwicon.icns
+
+else
+echo ""$USERNAME" does not have admin privileges"
+/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -title "Promote Admin" -heading "Error" -description "Something went wrong, Contact the Help Desk" -button1 "Dismiss" -defaultButton 1 -icon /Library/Hyperwallet/hwicon.icns
+fi
+
+exit 0
