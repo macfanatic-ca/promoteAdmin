@@ -1,11 +1,9 @@
 #!/bin/bash
+################ Variables #################
+# Designate how long the User's Admin privileges will last for (in seconds).
+admintime=600
 
-##############
-# TempAdmin.sh
-# This script will give a user 10 minutes of Admin privileges.
-# It contains an offline self-destruct to remove Admin privileges after designated time.
-# The designated time can be modified on line 27 - Integer in seconds.
-##############
+################ Do Not Edit ################
 
 USERNAME=`who |grep console| awk '{print $1}'`
 
@@ -24,7 +22,7 @@ echo "<?xml version="1.0" encoding="UTF-8"?>
         <string>/Library/ironsystems/removeTempAdmin.sh</string>
     </array>
     <key>StartInterval</key>
-    <integer>600</integer> 
+    <integer>"$admintime"</integer> 
 </dict> 
 </plist>" > /Library/LaunchDaemons/com.ironsystems.adminremove.plist
 #####
@@ -60,10 +58,13 @@ echo $USERNAME >> /Library/ironsystems/userToRemove
 # promote to admin
 /usr/sbin/dseditgroup -o edit -a $USERNAME -t user admin
 
+# Calculate admintime in minutes
+adminminutes=$(expr $admintime / 60)
+
 # notify
 /Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Utilities/Keychain\ Access.app/Contents/Resources/Keychain_Unlocked@2x.png -heading 'Admin Privileges Granted' -description "
 Please use responsibly. 
 All administrative activity is logged. 
-Access expires in 10 minutes." -button1 'OK' > /dev/null 2>&1 &
+Access expires in "$adminminutes" minutes." -button1 'OK' > /dev/null 2>&1 &
 
 exit 0
