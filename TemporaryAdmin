@@ -1,0 +1,70 @@
+#!/bin/bash
+################ Variables #################
+# Designate how long the User's Admin privileges will last for (in seconds).
+admintime=600
+
+################ Do Not Edit ################
+
+USERNAME=`who |grep console| awk '{print $1}'`
+
+# create LaunchDaemon to remove admin privileges
+#####
+echo "<?xml version="1.0" encoding="UTF-8"?> 
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"> 
+<plist version="1.0"> 
+<dict>
+    <key>Disabled</key>
+    <true/>
+    <key>Label</key> 
+    <string>com.ironsystems.adminremove</string> 
+    <key>ProgramArguments</key> 
+    <array> 
+        <string>/Library/ironsystems/removeTempAdmin.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>"$admintime"</integer> 
+</dict> 
+</plist>" > /Library/LaunchDaemons/com.ironsystems.adminremove.plist
+#####
+
+# create script to remove admin privileges
+#####
+echo '#!/bin/bash
+USERNAME=`cat /Library/ironsystems/userToRemove`
+/usr/sbin/dseditgroup -o edit -d $USERNAME -t user admin
+rm -f /Library/ironsystems/userToRemove
+rm -f /Library/LaunchDaemons/com.ironsystems.adminremove.plist
+rm -f /Library/ironsystems/removeTempAdmin.sh
+exit 0'  > /Library/ironsystems/removeTempAdmin.sh
+#####
+
+# correct permissions for above files
+chown root:wheel /Library/LaunchDaemons/com.ironsystems.adminremove.plist
+chmod 644 /Library/LaunchDaemons/com.ironsystems.adminremove.plist
+chown root:wheel /Library/ironsystems/removeTempAdmin.sh
+chmod 755 /Library/ironsystems/removeTempAdmin.sh
+
+# enable and load the LaunchDaemon
+defaults write /Library/LaunchDaemons/com.ironsystems.adminremove.plist Disabled -bool false
+launchctl load -w /Library/LaunchDaemons/com.ironsystems.adminremove.plist
+
+# build log file in /Library/ironsystems
+TIME=`date "+Date:%m-%d-%Y TIME:%H:%M:%S"`
+echo $TIME " by " $USERNAME >> /Library/ironsystems/TempAdmin.log
+
+# note the user
+echo $USERNAME >> /Library/ironsystems/userToRemove
+
+# promote to admin
+/usr/sbin/dseditgroup -o edit -a $USERNAME -t user admin
+
+# Calculate admintime in minutes
+adminminutes=$(expr $admintime / 60)
+
+# notify
+/Library/Application\ Support/JAMF/bin/jamfHelper.app/Contents/MacOS/jamfHelper -windowType utility -icon /Applications/Utilities/Keychain\ Access.app/Contents/Resources/Keychain_Unlocked@2x.png -heading 'Admin Privileges Granted' -description "
+Please use responsibly. 
+All administrative activity is logged. 
+Access expires in "$adminminutes" minutes." -button1 'OK' > /dev/null 2>&1 &
+
+exit 0
